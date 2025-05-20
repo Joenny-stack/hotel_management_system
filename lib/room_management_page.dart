@@ -186,6 +186,14 @@ class _RoomManagementPageState extends State<RoomManagementPage> {
                 if (mounted) {
                   Navigator.pop(context);
                   _fetchRooms();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(room == null ? 'Room added successfully!' : 'Room updated successfully!'),
+                      backgroundColor: Colors.green,
+                      duration: const Duration(seconds: 2),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
                 }
               }
             },
