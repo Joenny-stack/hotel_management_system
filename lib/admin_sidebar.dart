@@ -20,20 +20,7 @@ class AdminSidebar extends StatelessWidget {
         },
       ),
     );
-    // Room Service (for all, but especially for housekeeping)
-    if (role == 'housekeeping' || role == 'admin' || role == 'staff') {
-      navItems.add(
-        ListTile(
-          leading: const Icon(Icons.room_service, color: Colors.white),
-          title: const Text('Room Service', style: TextStyle(color: Colors.white)),
-          onTap: () {
-            if (ModalRoute.of(context)?.settings.name != '/room_service') {
-              Navigator.pushNamed(context, '/room_service', arguments: role);
-            }
-          },
-        ),
-      );
-    }
+
     if (role == 'admin') {
       navItems.addAll([
         ListTile(
@@ -64,6 +51,20 @@ class AdminSidebar extends StatelessWidget {
           },
         ),
       ]);
+    }
+        // Room Service (for all, but especially for housekeeping)
+    if (role == 'housekeeping' || role == 'admin' || role == 'staff') {
+      navItems.add(
+        ListTile(
+          leading: const Icon(Icons.room_service, color: Colors.white),
+          title: const Text('Room Service', style: TextStyle(color: Colors.white)),
+          onTap: () {
+            if (ModalRoute.of(context)?.settings.name != '/room_service') {
+              Navigator.pushNamed(context, '/room_service', arguments: role);
+            }
+          },
+        ),
+      );
     }
     // Notifications
     navItems.add(

@@ -324,6 +324,18 @@ class DBHelper {
         FOREIGN KEY (booking_id) REFERENCES bookings(id)
       )
     ''');
+    // --- NOTIFICATIONS TABLE ---
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT,
+        message TEXT,
+        role TEXT,
+        room_id INTEGER,
+        created_at TEXT,
+        is_read INTEGER DEFAULT 0
+      )
+    ''');
   }
 
   static Future<Database> _initDB() async {
