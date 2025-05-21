@@ -21,18 +21,8 @@ class AdminSidebar extends StatelessWidget {
       ),
     );
 
-    if (role == 'admin') {
-      navItems.addAll([
-        ListTile(
-          leading: const Icon(Icons.people, color: Colors.white),
-          title: const Text('Staff Management', style: TextStyle(color: Colors.white)),
-          onTap: () {
-            if (ModalRoute.of(context)?.settings.name != '/staff_management') {
-              Navigator.pushNamed(context, '/staff_management', arguments: role);
-            }
-          },
-        ),
-        ListTile(
+    navItems.add(
+    ListTile(
           leading: const Icon(Icons.book_online, color: Colors.white),
           title: const Text('Booking Management', style: TextStyle(color: Colors.white)),
           onTap: () {
@@ -40,7 +30,12 @@ class AdminSidebar extends StatelessWidget {
               Navigator.pushNamed(context, '/booking_management', arguments: role);
             }
           },
-        ),
+        )
+    );
+
+    if (role == 'admin') {
+      navItems.addAll([
+        
         ListTile(
           leading: const Icon(Icons.meeting_room, color: Colors.white),
           title: const Text('Room Management', style: TextStyle(color: Colors.white)),
@@ -50,10 +45,20 @@ class AdminSidebar extends StatelessWidget {
             }
           },
         ),
+        ListTile(
+          leading: const Icon(Icons.people, color: Colors.white),
+          title: const Text('Staff Management', style: TextStyle(color: Colors.white)),
+          onTap: () {
+            if (ModalRoute.of(context)?.settings.name != '/staff_management') {
+              Navigator.pushNamed(context, '/staff_management', arguments: role);
+            }
+          },
+        ),
+        
       ]);
     }
         // Room Service (for all, but especially for housekeeping)
-    if (role == 'housekeeping' || role == 'admin' || role == 'staff') {
+    if (role == 'housekeeping' || role == 'admin') {
       navItems.add(
         ListTile(
           leading: const Icon(Icons.room_service, color: Colors.white),
@@ -102,28 +107,25 @@ class AdminSidebar extends StatelessWidget {
         },
       ),
     );
-    // Staff Training (not for housekeeping)
-    if (role == 'admin' || role == 'staff') {
-      navItems.add(
-        ListTile(
-          leading: const Icon(Icons.school, color: Colors.white),
-          title: const Text('Staff Training', style: TextStyle(color: Colors.white)),
-          onTap: () {
-            if (ModalRoute.of(context)?.settings.name != '/staff_training') {
-              Navigator.pushNamed(context, '/staff_training', arguments: role);
-            }
-          },
-        ),
-      );
-    }
+    // Removed Staff Training nav item as requested
     // Security Settings
     navItems.add(
       ListTile(
         leading: const Icon(Icons.security, color: Colors.white),
-        title: const Text('Security Settings', style: TextStyle(color: Colors.white)),
+        title: const Text('Settings', style: TextStyle(color: Colors.white)),
         onTap: () {
           if (ModalRoute.of(context)?.settings.name != '/security_settings') {
-            Navigator.pushNamed(context, '/security_settings', arguments: role);
+            // Try to get userId from arguments if available, else null
+            final args = ModalRoute.of(context)?.settings.arguments;
+            int? userId;
+            if (args is Map && args['userId'] != null) {
+              userId = args['userId'] as int?;
+            }
+            Navigator.pushNamed(
+              context,
+              '/security_settings',
+              arguments: {'role': role, 'userId': userId},
+            );
           }
         },
       ),

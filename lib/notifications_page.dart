@@ -20,8 +20,14 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   Future<void> _fetchNotifications() async {
     final db = await DBHelper.database;
-    // Only show for housekeeping role for now
-    final res = await db.query('notifications', where: 'role = ?', whereArgs: ['housekeeping'], orderBy: 'created_at DESC');
+    // Get the current role from the widget tree
+    final role = ModalRoute.of(context)?.settings.arguments as String? ?? 'admin';
+    final res = await db.query(
+      'notifications',
+      where: 'role = ? OR role IS NULL',
+      whereArgs: [role],
+      orderBy: 'created_at DESC',
+    );
     setState(() {
       _notifications = res;
       _loading = false;
@@ -42,7 +48,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
   Widget build(BuildContext context) {
     final isWide = MediaQuery.of(context).size.width > 800;
     final pageName = 'Notifications';
-    final role = ModalRoute.of(context)?.settings.arguments as String? ?? 'housekeeping';
+    // Use the passed role if available, otherwise default to 'admin'
+    final role = ModalRoute.of(context)?.settings.arguments as String? ?? 'admin';
     final sidebar = AdminSidebar(pageName: pageName, role: role);
     final notificationList = _loading
         ? const Center(child: CircularProgressIndicator())
