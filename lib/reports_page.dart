@@ -77,8 +77,6 @@ class ReportsPage extends StatelessWidget {
                   const SizedBox(height: 24),
                   LayoutBuilder(
                     builder: (context, constraints) {
-                      final double maxWidth = constraints.maxWidth;
-                      final int cardsPerRow = maxWidth > 600 ? 2 : 1;
                       final List<Widget> tiles = [
                         _reportTile('Total Bookings', data['totalBookings'].toString(), Icons.book_online, Colors.blue),
                         _reportTile('Checked In', data['checkedIn'].toString(), Icons.login, Colors.green),
@@ -92,26 +90,17 @@ class ReportsPage extends StatelessWidget {
                         _reportTile('Housekeepers', data['housekeepersCount'].toString(), Icons.cleaning_services, Colors.pink),
                         _reportTile('Revenue', '\$${data['revenue'].toStringAsFixed(2)}', Icons.attach_money, Colors.green),
                       ];
-                      List<Row> rows = [];
-                      for (int i = 0; i < tiles.length; i += cardsPerRow) {
+                      List<Widget> rows = [];
+                      for (int i = 0; i < tiles.length; i += 2) {
                         rows.add(Row(
-                          mainAxisAlignment: MainAxisAlignment.start,
-                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            for (int j = 0; j < cardsPerRow; j++)
-                              if (i + j < tiles.length)
-                                Expanded(child: tiles[i + j]),
+                            Expanded(child: tiles[i]),
+                            if (i + 1 < tiles.length) Expanded(child: tiles[i + 1]),
                           ],
-                         ));
+                        ));
+                        if (i + 2 < tiles.length) rows.add(const SizedBox(height: 16));
                       }
-                      return Column(
-                        children: [
-                          for (int i = 0; i < rows.length; i++) ...[
-                            rows[i],
-                            if (i < rows.length - 1) const SizedBox(height: 16),
-                          ]
-                        ],
-                      );
+                      return Column(children: rows);
                     },
                   ),
                 ],
