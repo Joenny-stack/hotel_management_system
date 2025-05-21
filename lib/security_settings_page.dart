@@ -37,17 +37,17 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
   @override
   void initState() {
     super.initState();
-    // Use correct userId from arguments if available
-    final args = WidgetsBinding.instance.platformDispatcher.defaultRouteName == '/security_settings'
-        ? null
-        : ModalRoute.of(context)?.settings.arguments;
-    int? userId;
-    if (args is Map && args['userId'] != null) {
-      userId = args['userId'] as int?;
-    } else if (widget.userId != null) {
-      userId = widget.userId;
-    }
-    _fetchUser(userId: userId);
+    // Delay argument access until after build context is available
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final args = ModalRoute.of(context)?.settings.arguments;
+      int? userId;
+      if (args is Map && args['userId'] != null) {
+        userId = args['userId'] as int?;
+      } else if (widget.userId != null) {
+        userId = widget.userId;
+      }
+      _fetchUser(userId: userId);
+    });
   }
 
   Future<void> _fetchUser({int? userId}) async {
@@ -55,10 +55,38 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
     Map<String, dynamic>? user;
     if (userId != null) {
       final res = await db.query('users', where: 'id = ?', whereArgs: [userId], limit: 1);
-      if (res.isNotEmpty) user = res.first;
+      if (res.isNotEmpty) {
+        user = res.first;
+      } else {
+        // fallback: try to get by role if userId not found
+        final args = ModalRoute.of(context)?.settings.arguments;
+        String? role;
+        if (args is Map && args['role'] != null) {
+          role = args['role'] as String?;
+        } else if (widget.role != null) {
+          role = widget.role;
+        }
+        if (role != null) {
+          final resRole = await db.query('users', where: 'role = ?', whereArgs: [role], limit: 1);
+          if (resRole.isNotEmpty) user = resRole.first;
+        }
+      }
     } else {
-      final res = await db.query('users', limit: 1);
-      if (res.isNotEmpty) user = res.first;
+      // fallback: try to get by role if userId not provided
+      final args = ModalRoute.of(context)?.settings.arguments;
+      String? role;
+      if (args is Map && args['role'] != null) {
+        role = args['role'] as String?;
+      } else if (widget.role != null) {
+        role = widget.role;
+      }
+      if (role != null) {
+        final resRole = await db.query('users', where: 'role = ?', whereArgs: [role], limit: 1);
+        if (resRole.isNotEmpty) user = resRole.first;
+      } else {
+        final res = await db.query('users', limit: 1);
+        if (res.isNotEmpty) user = res.first;
+      }
     }
     setState(() {
       _userId = user?['id'];
