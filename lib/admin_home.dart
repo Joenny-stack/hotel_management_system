@@ -27,10 +27,11 @@ class _AdminHomePageState extends State<AdminHomePage> {
   Widget build(BuildContext context) {
     final isWide = MediaQuery.of(context).size.width > 800;
     final pageName = 'Dashboard';
+    final sidebar = const AdminSidebar(pageName: 'Dashboard');
     if (isWide) {
       return Row(
         children: [
-          const AdminSidebar(pageName: 'Dashboard'),
+          sidebar,
           Container(width: 1, color: Colors.black12),
           Expanded(
             child: Scaffold(
@@ -65,96 +66,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
             ),
           ],
         ),
-        drawer: Drawer(
-          child: ListView(
-            padding: EdgeInsets.zero,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-                child: Text(
-                  pageName,
-                  style: const TextStyle(
-                    color: Colors.deepPurple,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-              ),
-              ListTile(
-                leading: const Icon(Icons.people),
-                title: const Text('Staff Management'),
-                onTap: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const StaffManagementPage()));
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.book_online),
-                title: const Text('Booking Management'),
-                onTap: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const BookingManagementPage()));
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.meeting_room),
-                title: const Text('Room Management'),
-                onTap: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const RoomManagementPage()));
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.notifications),
-                title: const Text('Notifications'),
-                onTap: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsPage()));
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.feedback),
-                title: const Text('Feedback & Reviews'),
-                onTap: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const FeedbackPage()));
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.help),
-                title: const Text('Help & Support'),
-                onTap: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpSupportPage()));
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.school),
-                title: const Text('Staff Training'),
-                onTap: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const StaffTrainingPage()));
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.security),
-                title: const Text('Security Settings'),
-                onTap: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const SecuritySettingsPage()));
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.bar_chart),
-                title: const Text('Reports'),
-                onTap: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportsPage()));
-                },
-              ),
-              const Divider(),
-              ListTile(
-                leading: const Icon(Icons.logout),
-                title: const Text('Logout'),
-                onTap: () {
-                  Navigator.pushReplacementNamed(context, '/');
-                },
-              ),
-            ],
-          ),
-        ),
+        drawer: Drawer(child: sidebar),
         body: const Center(
           child: Text('Welcome to the Admin Dashboard! Use the menu to navigate.'),
         ),

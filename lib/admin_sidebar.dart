@@ -172,9 +172,11 @@ class AdminSidebar extends StatelessWidget {
         return true;
       }).toList();
     }
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       width: 260,
-      color: Colors.deepPurple,
+      color: isDark ? Colors.black : Colors.blue,
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
