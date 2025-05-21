@@ -149,8 +149,28 @@ class AdminSidebar extends StatelessWidget {
       ListTile(
         leading: const Icon(Icons.logout, color: Colors.white),
         title: const Text('Logout', style: TextStyle(color: Colors.white)),
-        onTap: () {
-          Navigator.pushReplacementNamed(context, '/');
+        onTap: () async {
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Confirm Logout'),
+              content: const Text('Are you sure you want to logout?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  child: const Text('Logout'),
+                ),
+              ],
+            ),
+          );
+          if (confirmed == true) {
+            Navigator.pushReplacementNamed(context, '/');
+          }
         },
       ),
     );

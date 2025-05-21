@@ -84,22 +84,50 @@ class _AdminHomePageState extends State<AdminHomePage> {
     return activity.take(5).toList();
   }
 
-  Widget _reportTile(String label, String value, IconData icon, Color color) {
+  Future<void> _confirmLogout(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      Navigator.pushReplacementNamed(context, '/');
+    }
+  }
+
+  Widget _reportTile(String label, String value, IconData icon, Color color, {VoidCallback? onTap}) {
     return SizedBox(
       width: 180,
       child: Card(
         color: color.withOpacity(0.1),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 32, color: color),
-              const SizedBox(height: 8),
-              Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              Text(value, style: TextStyle(fontSize: 20, color: color, fontWeight: FontWeight.bold)),
-            ],
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 32, color: color),
+                const SizedBox(height: 8),
+                Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                Text(value, style: TextStyle(fontSize: 20, color: color, fontWeight: FontWeight.bold)),
+              ],
+            ),
           ),
         ),
       ),
@@ -175,17 +203,24 @@ class _AdminHomePageState extends State<AdminHomePage> {
         }
         final data = snapshot.data!;
         final List<Widget> tiles = [
-          _reportTile('Total Bookings', data['totalBookings'].toString(), Icons.book_online, Colors.blue),
-          _reportTile('Checked In', data['checkedIn'].toString(), Icons.login, Colors.green),
-          _reportTile('Checked Out', data['checkedOut'].toString(), Icons.logout, Colors.grey),
-          _reportTile('Cancelled', data['cancelled'].toString(), Icons.cancel, Colors.red),
-          _reportTile('Total Rooms', data['totalRooms'].toString(), Icons.meeting_room, Colors.deepPurple),
-          _reportTile('Available Rooms', data['availableRooms'].toString(), Icons.hotel, Colors.teal),
-          _reportTile('Occupied Rooms', data['occupiedRooms'].toString(), Icons.bed, Colors.orange),
-          _reportTile('Dirty Rooms', data['dirtyRooms'].toString(), Icons.warning, Colors.brown),
-          _reportTile('Staff', data['staffCount'].toString(), Icons.people, Colors.indigo),
-          _reportTile('Housekeepers', data['housekeepersCount'].toString(), Icons.cleaning_services, Colors.pink),
-          _reportTile('Revenue', '\$${data['revenue'].toStringAsFixed(2)}', Icons.attach_money, Colors.green),
+          _reportTile('Total Bookings', data['totalBookings'].toString(), Icons.book_online, Colors.blue,
+            onTap: () => Navigator.pushNamed(context, '/booking_management'),
+          ),
+          _reportTile('Checked In', data['checkedIn'].toString(), Icons.login, Colors.green,
+            onTap: () => Navigator.pushNamed(context, '/booking_management'),
+          ),
+          _reportTile('Checked Out', data['checkedOut'].toString(), Icons.logout, Colors.grey,
+            onTap: () => Navigator.pushNamed(context, '/booking_management'),
+          ),
+          _reportTile('Available Rooms', data['availableRooms'].toString(), Icons.hotel, Colors.teal,
+            onTap: () => Navigator.pushNamed(context, '/room_management'),
+          ),
+          _reportTile('Occupied Rooms', data['occupiedRooms'].toString(), Icons.bed, Colors.orange,
+            onTap: () => Navigator.pushNamed(context, '/room_management'),
+          ),
+          _reportTile('Revenue', '\$${data['revenue'].toStringAsFixed(2)}', Icons.attach_money, Colors.green,
+            onTap: () => Navigator.pushNamed(context, '/reports'),
+          ),
         ];
         List<Widget> rows = [];
         for (int i = 0; i < tiles.length; i += 2) {
@@ -218,7 +253,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
     if (isWide) {
       return Row(
         children: [
-          sidebar,
+          AdminSidebar(pageName: pageName, role: 'admin'),
           Container(width: 1, color: Colors.black12),
           Expanded(
             child: Scaffold(
@@ -227,9 +262,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
                 actions: [
                   IconButton(
                     icon: const Icon(Icons.logout),
-                    onPressed: () {
-                      Navigator.pushReplacementNamed(context, '/');
-                    },
+                    onPressed: () => _confirmLogout(context),
                   ),
                 ],
               ),
@@ -245,13 +278,11 @@ class _AdminHomePageState extends State<AdminHomePage> {
           actions: [
             IconButton(
               icon: const Icon(Icons.logout),
-              onPressed: () {
-                Navigator.pushReplacementNamed(context, '/');
-              },
+              onPressed: () => _confirmLogout(context),
             ),
           ],
         ),
-        drawer: Drawer(child: sidebar),
+        drawer: Drawer(child: AdminSidebar(pageName: pageName, role: 'admin')),
         body: dashboardContent,
       );
     }
