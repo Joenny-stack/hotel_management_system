@@ -96,6 +96,8 @@ class _CurrentBookingsTabState extends State<_CurrentBookingsTab> {
   List<Room> _rooms = [];
   String _search = '';
   bool _loading = true;
+  int _currentPage = 0;
+  static const int _pageSize = 10;
 
   @override
   void initState() {
@@ -117,8 +119,11 @@ class _CurrentBookingsTabState extends State<_CurrentBookingsTab> {
   }
 
   List<Booking> get _filteredBookings {
-    if (_search.isEmpty) return _bookings;
+    if (_search.isEmpty) {
+      return _bookings.where((b) => b.bookingStatus != 'checked_out').toList();
+    }
     return _bookings.where((b) {
+      if (b.bookingStatus == 'checked_out') return false;
       final guest = _guests.firstWhere((g) => g.id == b.guestId, orElse: () => Guest(fullName: '', phone: '', email: '', idNumber: '', preferences: '', notes: ''));
       final room = _rooms.firstWhere((r) => r.id == b.roomId, orElse: () => Room(id: 0, roomNumber: '', type: '', pricePerNight: 0, status: '', roomClass: ''));
       return guest.fullName.toLowerCase().contains(_search.toLowerCase()) ||
@@ -127,6 +132,34 @@ class _CurrentBookingsTabState extends State<_CurrentBookingsTab> {
         b.checkInDate.contains(_search) ||
         b.checkOutDate.contains(_search);
     }).toList();
+  }
+
+  List<Booking> get _pagedFilteredBookings {
+    final filtered = _filteredBookings;
+    final start = _currentPage * _pageSize;
+    final end = (start + _pageSize) > filtered.length ? filtered.length : (start + _pageSize);
+    return filtered.sublist(start, end);
+  }
+
+  bool _isOverlapping(Booking booking) {
+    return _bookings.any((b) =>
+      b.id != booking.id &&
+      b.roomId == booking.roomId &&
+      DateTime.parse(b.checkInDate).isBefore(DateTime.parse(booking.checkOutDate)) &&
+      DateTime.parse(b.checkOutDate).isAfter(DateTime.parse(booking.checkInDate))
+    );
+  }
+
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'pending': return Colors.orange;
+      case 'confirmed': return Colors.blue;
+      case 'checked_in': return Colors.green;
+      case 'checked_out': return Colors.grey;
+      case 'cancelled': return Colors.red;
+      case 'no_show': return Colors.purple;
+      default: return Colors.black54;
+    }
   }
 
   String _getGuestName(int? guestId) {
@@ -145,11 +178,24 @@ class _CurrentBookingsTabState extends State<_CurrentBookingsTab> {
     } else if (action == 'checkin') {
       _showCheckInDialog(booking);
     } else if (action == 'checkout') {
+      // Set booking checked_out, insert history, set room dirty, notify housekeepers
       await BookingDB.updateBooking(booking.copyWith(bookingStatus: 'checked_out'));
       await BookingDB.insertBookingHistory(booking.copyWith(bookingStatus: 'checked_out'));
+      // Set room housekeepingStatus to 'dirty'
+      final db = await DBHelper.database;
+      await db.update('rooms', {'housekeeping_status': 'dirty'}, where: 'id = ?', whereArgs: [booking.roomId]);
+      // Insert notification for housekeepers
+      await db.insert('notifications', {
+        'title': 'Room needs cleaning',
+        'message': 'Room ${_getRoomDisplay(booking.roomId)} is now dirty and needs cleaning.',
+        'role': 'housekeeping',
+        'room_id': booking.roomId,
+        'created_at': DateTime.now().toIso8601String(),
+        'is_read': 0
+      });
       _fetchAll();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Checked out!'), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Checked out! Room marked dirty and housekeepers notified.'), backgroundColor: Colors.green));
       }
     } else if (action == 'cancel') {
       await BookingDB.deleteBooking(booking.id!);
@@ -198,7 +244,6 @@ class _CurrentBookingsTabState extends State<_CurrentBookingsTab> {
       );
       return;
     }
-    // Not paid: use ValueNotifier for checkbox and button state
     final paymentConfirmedNotifier = ValueNotifier<bool>(false);
     showDialog(
       context: context,
@@ -266,10 +311,8 @@ class _CurrentBookingsTabState extends State<_CurrentBookingsTab> {
 
     // Fetch rooms and guests for dropdowns
     final allRooms = await DBHelper.getRooms();
-    final currentRoom = allRooms.firstWhere((r) => r.id == booking.roomId, orElse: () => allRooms.first);
     final availableRooms = allRooms.where((r) => r.status == 'available' || r.id == booking.roomId).toList();
-    int selectedRoomId = booking.roomId!;
-
+    int selectedRoomId = booking.roomId;
     DateTime checkInDate = DateTime.parse(booking.checkInDate);
     DateTime checkOutDate = DateTime.parse(booking.checkOutDate);
 
@@ -448,7 +491,10 @@ class _CurrentBookingsTabState extends State<_CurrentBookingsTab> {
                     prefixIcon: Icon(Icons.search),
                     border: OutlineInputBorder(),
                   ),
-                  onChanged: (v) => setState(() => _search = v),
+                  onChanged: (v) => setState(() {
+                    _search = v;
+                    _currentPage = 0;
+                  }),
                 ),
               ),
               const SizedBox(width: 12),
@@ -463,45 +509,102 @@ class _CurrentBookingsTabState extends State<_CurrentBookingsTab> {
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
-                : _filteredBookings.isEmpty
+                : _pagedFilteredBookings.isEmpty
                     ? const Center(child: Text('No bookings found.'))
-                    : ListView.builder(
-                        itemCount: _filteredBookings.length,
-                        itemBuilder: (context, index) {
-                          final booking = _filteredBookings[index];
-                          return Card(
-                            margin: const EdgeInsets.symmetric(vertical: 8),
-                            child: ListTile(
-                              leading: const Icon(Icons.hotel, size: 36, color: Colors.deepPurple),
-                              title: Text(_getGuestName(booking.guestId)),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(_getRoomDisplay(booking.roomId)),
-                                  Text('Check-in: ${booking.checkInDate}'),
-                                  Text('Check-out: ${booking.checkOutDate}'),
-                                  Text('Status: ${booking.bookingStatus}'),
-                                ],
-                              ),
-                              trailing: PopupMenuButton<String>(
-                                onSelected: (value) => _handleAction(value, booking),
-                                itemBuilder: (context) {
-                                  if (booking.bookingStatus == 'checked_in') {
-                                    return [
-                                      const PopupMenuItem(value: 'checkout', child: Text('Check Out')),
-                                    ];
-                                  } else {
-                                    return [
-                                      const PopupMenuItem(value: 'checkin', child: Text('Check In')),
-                                      const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                                      const PopupMenuItem(value: 'cancel', child: Text('Cancel')),
-                                    ];
-                                  }
-                                },
-                              ),
+                    : Column(
+                        children: [
+                          Expanded(
+                            child: ListView.builder(
+                              itemCount: _pagedFilteredBookings.length,
+                              itemBuilder: (context, index) {
+                                final booking = _pagedFilteredBookings[index];
+                                final isOverlap = _isOverlapping(booking);
+                                return Card(
+                                  margin: const EdgeInsets.symmetric(vertical: 8),
+                                  color: isOverlap ? Colors.red[50] : null,
+                                  shape: isOverlap
+                                      ? RoundedRectangleBorder(
+                                          side: const BorderSide(color: Colors.red, width: 2),
+                                          borderRadius: BorderRadius.circular(8),
+                                        )
+                                      : null,
+                                  child: ExpansionTile(
+                                    leading: const Icon(Icons.hotel, size: 36, color: Colors.deepPurple),
+                                    title: Row(
+                                      children: [
+                                        Expanded(child: Text(_getGuestName(booking.guestId))),
+                                        const SizedBox(width: 8),
+                                        Chip(
+                                          label: Text(booking.bookingStatus.replaceAll('_', ' ').toUpperCase()),
+                                          backgroundColor: _statusColor(booking.bookingStatus),
+                                          labelStyle: const TextStyle(color: Colors.white),
+                                        ),
+                                      ],
+                                    ),
+                                    subtitle: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(_getRoomDisplay(booking.roomId)),
+                                        Text('Check-in: ${booking.checkInDate}'),
+                                        Text('Check-out: ${booking.checkOutDate}'),
+                                      ],
+                                    ),
+                                    trailing: PopupMenuButton<String>(
+                                      onSelected: (value) => _handleAction(value, booking),
+                                      itemBuilder: (context) {
+                                        if (booking.bookingStatus == 'checked_in') {
+                                          return [
+                                            const PopupMenuItem(value: 'checkout', child: Text('Check Out')),
+                                          ];
+                                        } else {
+                                          return [
+                                            const PopupMenuItem(value: 'checkin', child: Text('Check In')),
+                                            const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                                            const PopupMenuItem(value: 'cancel', child: Text('Cancel')),
+                                          ];
+                                        }
+                                      },
+                                    ),
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text('Guest Details:', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                            Text(_getGuestName(booking.guestId)),
+                                            Text('Room Details:', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                            Text(_getRoomDisplay(booking.roomId)),
+                                            if (booking.notes != null && booking.notes!.isNotEmpty)
+                                              Text('Notes: ${booking.notes}'),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
                             ),
-                          );
-                        },
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.chevron_left),
+                                onPressed: _currentPage > 0
+                                    ? () => setState(() => _currentPage--)
+                                    : null,
+                              ),
+                              Text('Page ${_currentPage + 1} of ${(_filteredBookings.length / _pageSize).ceil().clamp(1, 999)}'),
+                              IconButton(
+                                icon: const Icon(Icons.chevron_right),
+                                onPressed: (_currentPage + 1) * _pageSize < _filteredBookings.length
+                                    ? () => setState(() => _currentPage++)
+                                    : null,
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
           ),
         ],
@@ -1130,6 +1233,8 @@ class _BookingHistoryTabState extends State<_BookingHistoryTab> {
   List<Booking> _bookings = [];
   String _search = '';
   bool _loading = true;
+  int _currentPage = 0;
+  static const int _pageSize = 10;
 
   @override
   void initState() {
@@ -1170,6 +1275,25 @@ class _BookingHistoryTabState extends State<_BookingHistoryTab> {
     }).toList();
   }
 
+  List<Map<String, dynamic>> get _pagedFilteredHistory {
+    final filtered = _filteredHistory;
+    final start = _currentPage * _pageSize;
+    final end = (start + _pageSize) > filtered.length ? filtered.length : (start + _pageSize);
+    return filtered.sublist(start, end);
+  }
+
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'pending': return Colors.orange;
+      case 'confirmed': return Colors.blue;
+      case 'checked_in': return Colors.green;
+      case 'checked_out': return Colors.grey;
+      case 'cancelled': return Colors.red;
+      case 'no_show': return Colors.purple;
+      default: return Colors.black54;
+    }
+  }
+
   String _getGuestName(dynamic guestId) {
     if (guestId == null) return 'Unknown';
     final guest = _guests.firstWhere((g) => g.id == guestId, orElse: () => Guest(fullName: 'Unknown', phone: '', email: '', idNumber: '', preferences: '', notes: ''));
@@ -1198,7 +1322,10 @@ class _BookingHistoryTabState extends State<_BookingHistoryTab> {
                     prefixIcon: Icon(Icons.search),
                     border: OutlineInputBorder(),
                   ),
-                  onChanged: (v) => setState(() => _search = v),
+                  onChanged: (v) => setState(() {
+                    _search = v;
+                    _currentPage = 0;
+                  }),
                 ),
               ),
               const SizedBox(width: 12),
@@ -1213,35 +1340,83 @@ class _BookingHistoryTabState extends State<_BookingHistoryTab> {
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
-                : _filteredHistory.isEmpty
+                : _pagedFilteredHistory.isEmpty
                     ? const Center(child: Text('No booking history found.'))
-                    : ListView.builder(
-                        itemCount: _filteredHistory.length,
-                        itemBuilder: (context, index) {
-                          final h = _filteredHistory[index];
-                          final guestName = _getGuestName(h['guest_id']);
-                          final roomDisplay = _getRoomDisplay(h['room_id']);
-                          return Card(
-                            margin: const EdgeInsets.symmetric(vertical: 8),
-                            child: ListTile(
-                              leading: const Icon(Icons.history, size: 36, color: Colors.grey),
-                              title: Text(guestName),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(roomDisplay),
-                                  Text('Check-in: ${h['check_in_date'] ?? ''}'),
-                                  Text('Check-out: ${h['check_out_date'] ?? ''}'),
-                                  if (h['payment_status'] != null) Text('Payment: ${h['payment_status']}'),
-                                  if (h['total_amount'] != null) Text('Total: ${h['total_amount']}'),
-                                  Text('Status: ${h['status'] ?? ''}'),
-                                  if ((h['notes'] ?? '').toString().isNotEmpty) Text('Notes: ${h['notes']}'),
-                                  Text('Changed: ${h['changed_at']?.toString().substring(0, 19) ?? ''}'),
-                                ],
-                              ),
+                    : Column(
+                        children: [
+                          Expanded(
+                            child: ListView.builder(
+                              itemCount: _pagedFilteredHistory.length,
+                              itemBuilder: (context, index) {
+                                final h = _pagedFilteredHistory[index];
+                                return Card(
+                                  margin: const EdgeInsets.symmetric(vertical: 8),
+                                  child: ExpansionTile(
+                                    leading: const Icon(Icons.history, size: 36, color: Colors.grey),
+                                    title: Row(
+                                      children: [
+                                        Expanded(child: Text(_getGuestName(h['guest_id']))),
+                                        const SizedBox(width: 8),
+                                        Chip(
+                                          label: Text((h['status'] ?? '').toString().replaceAll('_', ' ').toUpperCase()),
+                                          backgroundColor: _statusColor(h['status'] ?? ''),
+                                          labelStyle: const TextStyle(color: Colors.white),
+                                        ),
+                                      ],
+                                    ),
+                                    subtitle: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(_getRoomDisplay(h['room_id'])),
+                                        Text('Check-in: ${h['check_in_date'] ?? ''}'),
+                                        Text('Check-out: ${h['check_out_date'] ?? ''}'),
+                                      ],
+                                    ),
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text('Guest Details:', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                            Text(_getGuestName(h['guest_id'])),
+                                            Text('Room Details:', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                            Text(_getRoomDisplay(h['room_id'])),
+                                            if ((h['notes'] ?? '').toString().isNotEmpty)
+                                              Text('Notes: ${h['notes']}'),
+                                            if (h['payment_status'] != null)
+                                              Text('Payment: ${h['payment_status']}'),
+                                            if (h['total_amount'] != null)
+                                              Text('Total: ${h['total_amount']}'),
+                                            Text('Changed: ${h['changed_at']?.toString().substring(0, 19) ?? ''}'),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
                             ),
-                          );
-                        },
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.chevron_left),
+                                onPressed: _currentPage > 0
+                                    ? () => setState(() => _currentPage--)
+                                    : null,
+                              ),
+                              Text('Page ${_currentPage + 1} of ${(_filteredHistory.length / _pageSize).ceil().clamp(1, 999)}'),
+                              IconButton(
+                                icon: const Icon(Icons.chevron_right),
+                                onPressed: (_currentPage + 1) * _pageSize < _filteredHistory.length
+                                    ? () => setState(() => _currentPage++)
+                                    : null,
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
           ),
         ],
