@@ -184,6 +184,8 @@ class _CurrentBookingsTabState extends State<_CurrentBookingsTab> {
       // Set room housekeepingStatus to 'dirty'
       final db = await DBHelper.database;
       await db.update('rooms', {'housekeeping_status': 'dirty'}, where: 'id = ?', whereArgs: [booking.roomId]);
+      // Set room status to 'available' on checkout
+      await db.update('rooms', {'status': 'available'}, where: 'id = ?', whereArgs: [booking.roomId]);
       // Insert notification for housekeepers
       await db.insert('notifications', {
         'title': 'Room needs cleaning',
@@ -231,6 +233,9 @@ class _CurrentBookingsTabState extends State<_CurrentBookingsTab> {
                     paymentStatus: 'paid',
                   ),
                 );
+                // Set room status to 'occupied' on check-in
+                final db = await DBHelper.database;
+                await db.update('rooms', {'status': 'occupied'}, where: 'id = ?', whereArgs: [booking.roomId]);
                 Navigator.pop(context);
                 _fetchAll();
                 if (mounted) {
@@ -286,6 +291,9 @@ class _CurrentBookingsTabState extends State<_CurrentBookingsTab> {
                           paymentStatus: 'paid',
                         ),
                       );
+                      // Set room status to 'occupied' on check-in
+                      final db = await DBHelper.database;
+                      await db.update('rooms', {'status': 'occupied'}, where: 'id = ?', whereArgs: [booking.roomId]);
                       Navigator.pop(context);
                       _fetchAll();
                       if (mounted) {

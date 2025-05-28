@@ -169,7 +169,8 @@ class AdminSidebar extends StatelessWidget {
             ),
           );
           if (confirmed == true) {
-            Navigator.pushReplacementNamed(context, '/');
+            // Remove all previous routes so back button does not return to previous account
+            Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
           }
         },
       ),

@@ -240,7 +240,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Hotel Summary', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+          const Text('Hotel Summary(Today)', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
           const SizedBox(height: 24),
           summaryCards,
           const SizedBox(height: 32),
